@@ -3,13 +3,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- LLM ---
+# --- LLM (Groq — genuinely free tier) ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 LLM_MODEL = "llama-3.3-70b-versatile"
 
-# --- Agent ---
-MAX_TOOL_ROUNDS = 5   # Maximum tool-calling loops before stopping
-                      # Prevents runaway agent loops
+# --- Job postings API (JSearch via RapidAPI) ---
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+JSEARCH_HOST = "jsearch.p.rapidapi.com"
+JSEARCH_URL = "https://jsearch.p.rapidapi.com/search"
 
-# --- Data ---
-DATA_PATH = "./data"
+# How many postings to pull and feed to the AI. Keep this small while building —
+# more postings = more tokens = slower + closer to rate limits.
+POSTINGS_TO_ANALYZE = 5
