@@ -1,4 +1,4 @@
-# 🎯 Career Prep Map
+# Career Prep Map
 
 Type a target role ("Google Internship", "AI Engineer", "SWE Intern at Meta") and
 get back a complete, free prep plan: the skills the role demands, how to learn each
