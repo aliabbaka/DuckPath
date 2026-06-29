@@ -28,76 +28,45 @@ from llm import client
 # ================================================================================
 # PRIMARY OWNER: Person A (The Driver) | REVIEWER: Person B (The Navigator)
 def analyze_postings(role: str, job_descriptions: list[str]) -> dict:
-    """Ask the AI to read the postings and return structured skills & signals.
+    """Ask the AI to read the postings and return structured skills & signals."""
+    # Guard Clause: If no job descriptions are provided, return an empty contract shape
+    if not job_descriptions:
+        return {"core_skills": [], "interview_focus": [], "experience_signals": []}
 
-    LEARNING OBJECTIVES FOR THIS STEP:
-    - How to bundle unstructured text data cleanly for an AI prompt.
-    - How to use Structured Outputs (`json_object`) to stop an AI from talking.
-    - How to safely unpack stringified text back into an operational Python Dict.
+    # STEP 1.1: Bundle the listings cleanly using a markdown horizontal rule divider
+    combined_postings = "\n\n---\n\n".join(job_descriptions)
 
-    Where to learn it:
-    - OpenAI Structured JSON Guide: https://openai.com
+    # STEP 1.2: Execute the structured inference call to the LLM Client API
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        response_format={"type": "json_object"},  # Enforce programmatic JSON formatting
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert technical recruiter. You must output a JSON "
+                    "object with exactly these keys: "
+                    "'core_skills' (a list of specific technical skill names as strings), "
+                    "'interview_focus' (a list of 3-5 short phrases about what gets tested), "
+                    "'experience_signals' (a list of tools or certifications requested). "
+                    "Do not include any conversational intro or outro text. Respond "
+                    "ONLY with valid JSON formatting."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Target Role: {role}\n\nJob Postings Data:\n{combined_postings}",
+            },
+        ],
+    )
 
-    ----------------------------------------------------------------------------
-    STEP 1.1: BUNDLE THE POSTINGS
-    ----------------------------------------------------------------------------
-    What to do: Combine the separate job descriptions into one massive string.
-    Why: The AI model processes text sequentially. Separating them with explicit
-         visual markers prevents the AI from blending separate jobs together.
-    How: Use `"\n\n---\n\n".join(job_descriptions)` to merge the list items.
+    # STEP 1.3: Extract the raw flat text string payload from the network message
+    raw_json_string = response.choices[0].message.content
 
-    ----------------------------------------------------------------------------
-    STEP 1.2: BUILD THE COMPLETION CALL
-    ----------------------------------------------------------------------------
-    What to do: Call `client.chat.completions.create(...)` using your configurations.
-    Why: Passing `response_format={"type": "json_object"}` acts as an absolute 
-         constraint on the model, forcing it to output clean JSON markup.
-    
-    How to configure the call:
-    - model=LLM_MODEL
-    - response_format={"type": "json_object"}
-    - messages=[
-         {
-             "role": "system", 
-             "content": (
-                 "You are an expert technical recruiter. You must output a JSON "
-                 "object with exactly these keys: "
-                 "'core_skills' (a list of technical strings), "
-                 "'interview_focus' (a list of 3-5 short phrases of what is tested), "
-                 "'experience_signals' (a list of tools or certs explicitly requested). "
-                 "Do not include any conversational intro or outro text. Respond "
-                 "ONLY with valid JSON formatting."
-             )
-         },
-         {
-             "role": "user", 
-             "content": f"Role: {role}\n\nJob Postings:\n{YOUR_COMBINED_STRING_HERE}"
-         }
-      ]
+    # Deserialize the string text back into a functional Python dictionary
+    analysis_data = json.loads(raw_json_string)
 
-    ----------------------------------------------------------------------------
-    STEP 1.3: EXTRACT AND UNPACK THE DATA
-    ----------------------------------------------------------------------------
-    What to do: Capture the text string from the response and run `json.loads()`.
-    
-    CRITICAL BEGINNER TRAP: 
-    The AI data arrives inside `response.choices[0].message.content`. This looks 
-    like a dictionary, but it is actually a standard, flat String! If you try 
-    to read it using keys right away, your app will instantly crash.
-    
-    How to fix it: Pass that raw string into `json.loads(raw_string)`. This converts 
-    it into an operational Python Dictionary that the rest of your app can read.
-
-    CONTRACT OUTCOME:
-    returns: {
-        "core_skills": list[str],
-        "interview_focus": list[str],
-        "experience_signals": list[str]
-    }
-    """
-    # TODO — Person A: Delete the stub below and implement the AI logic!
-    raise NotImplementedError("Phase 3: implement analyze_postings()")
-
+    return analysis_data
 
 # ================================================================================
 # FUNCTION 2: DE-DUPLICATE AND RANK THE TRACKED DATA
