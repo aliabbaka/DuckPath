@@ -19,8 +19,8 @@ Git never has to reconcile the same lines.
 |------|-------|------|-------|
 | `config.py` | 0 | env vars + constants | done ✅ |
 | `llm.py` | 0 | one shared Groq client | done ✅ |
-| `jobs.py` | 2 | fetch real postings from JSearch | **A** |
-| `analysis.py` | 3 | AI: postings → skills + interview signals | **A + B (pair)** |
+| `jobs.py` | 2 | fetch real postings from JSearch | done ✅ | **A** |
+| `analysis.py` | 3 | AI: postings → skills + interview signals | done ✅ | **A + B (pair)** |
 | `resources.py` | 4 | curated: how to learn each skill free | **A** (fundamentals) + **B** (specialized) |
 | `projects.py` | 5 | AI: project idea per skill | **A** |
 | `practice.py` | 5 | curated: where to practice free | **B** |
