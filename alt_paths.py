@@ -33,8 +33,32 @@ def suggest_alt_paths(skill: str, role: str) -> dict:
             "devops_architecture": str,
         }
     """
-    # TODO: replace this stub
-    raise NotImplementedError("Phase 6: implement suggest_alt_paths()")
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        response_format={"type": "json_object"},
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert career coach. Suggest one concrete idea in EACH of "
+                    "these five proof categories: 'open_source', 'technical_writing', "
+                    "'community_leadership', 'competitions', 'devops_architecture'. "
+                    "For open source, point to GitHub's good-first-issue / help-wanted "
+                    "labels rather than naming one repo that may be dead. If a category "
+                    "doesn't fit the role, say so honestly instead of forcing a bad answer. "
+                    "Respond ONLY with valid JSON formatting."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Skill: {skill}\n\nRole: {role}",
+            },
+        ],
+    )
+
+    # Extract the raw JSON string from the response and deserialize it into a dict
+    raw_json_string = response.choices[0].message.content
+    return json.loads(raw_json_string)
 
 
 if __name__ == "__main__":
