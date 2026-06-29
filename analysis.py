@@ -146,9 +146,13 @@ def rank_skills(skill_lists: list[list[str]]) -> list[str]:
                           from the most common down to the least common.
     """
     # TODO — Person B: Delete the stub below and implement the ranking logic!
-    raise NotImplementedError("Phase 3: implement rank_skills()")
-
-
+    clean_skills = []
+    for sublist in skill_lists:
+        for skill in sublist:
+            clean_skills.append(skill.strip().lower())
+    # Step 2.2: COUNTER AND EXTRACT POPULARITY
+    counts = Counter(clean_skills)
+    return [skill for skill, _ in counts.most_common()]
 # ================================================================================
 # LOCAL SMOKE TEST
 # ================================================================================
