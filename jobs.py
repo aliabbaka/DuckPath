@@ -96,8 +96,30 @@ def fetch_postings(role: str) -> list[str]:
     ----------------------------------------------------------------------------
     """
     # TODO: Delete the two lines below and write your pair-programming solution here!
-    raise NotImplementedError("Phase 2: implement fetch_postings()")
-
+#step 1: Prepare and send the network request
+    headers= {
+    "X-RapidAPI-Key": RAPIDAPI_KEY, # type: ignore
+    "X-RapidAPI-Host": JSEARCH_HOST # type: ignore
+    } # type: ignore
+    params= {
+    "query": role, # type: ignore
+    "num_pages": "1"
+    } # type: ignore
+    try:
+        response = requests.get(JSEARCH_URL, headers=headers, params=params)
+        if response.status_code != 200:
+            return []
+        data_dict = response.json()
+        if "data" not in data_dict or not data_dict["data"]:
+            return []
+        descriptions = []
+        for job in data_dict["data"]:
+            description = job.get("job_description")
+            if description:
+                descriptions.append(description)
+        return descriptions[:POSTINGS_TO_ANALYZE]
+    except requests.RequestException:
+        return []
 
 # ================================================================================
 # LOCAL SMOKE TEST
