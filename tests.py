@@ -32,7 +32,10 @@ from unittest.mock import patch, MagicMock
 
 # ── Imports from our own files ────────────────────────────────────────────────
 from resources import LEARNING_RESOURCES, normalize_skill, get_resources
-from simulations import JOB_SIMULATIONS, INTERVIEW_SIMULATORS, get_simulations
+from simulations import (
+    JOB_SIMULATIONS, INTERVIEW_SIMULATORS, _ROLE_KEYWORDS,
+    _match_role, get_simulations, get_interview_simulators,
+)
 from practice import PRACTICE_RESOURCES, get_practice
 from outreach import COLD_EMAIL_TEMPLATE, OUTREACH_QUESTIONS, build_outreach_kit
 from analysis import rank_skills, analyze_postings
@@ -46,43 +49,57 @@ from jobs import fetch_postings
 class TestLearningResourcesData:
     """Validate the LEARNING_RESOURCES dictionary is correctly shaped.
 
-    These tests run against the raw data — no functions needed. They catch
-    typos like a missing key or a wrong type for free_certificate.
+    Each entry has the structure: LEARNING_RESOURCES[skill]["basics"][field].
+    These tests catch typos like a missing key or wrong type for free_certificate.
     """
 
-    REQUIRED_KEYS = {"docs", "video", "course", "free_certificate"}
+    REQUIRED_BASICS_KEYS = {"docs", "video", "course", "free_certificate"}
+
+    def _basics(self, skill):
+        """Navigate to the 'basics' sub-dict for a skill."""
+        return LEARNING_RESOURCES[skill]["basics"]
 
     def test_dict_is_not_empty(self):
         assert len(LEARNING_RESOURCES) > 0, "LEARNING_RESOURCES is empty — add entries"
 
-    def test_every_entry_has_required_keys(self):
+    def test_every_entry_has_basics_key(self):
         for skill, entry in LEARNING_RESOURCES.items():
-            missing = self.REQUIRED_KEYS - set(entry.keys())
-            assert not missing, f"'{skill}' is missing keys: {missing}"
+            assert "basics" in entry, (
+                f"'{skill}' is missing the 'basics' key — check its structure"
+            )
+
+    def test_every_basics_has_required_keys(self):
+        for skill in LEARNING_RESOURCES:
+            basics = self._basics(skill)
+            missing = self.REQUIRED_BASICS_KEYS - set(basics.keys())
+            assert not missing, f"'{skill}[basics]' is missing keys: {missing}"
 
     def test_free_certificate_is_bool_or_none(self):
         # True = cert is free, False = audit free but cert costs money, None = no cert
-        for skill, entry in LEARNING_RESOURCES.items():
-            val = entry["free_certificate"]
+        for skill in LEARNING_RESOURCES:
+            val = self._basics(skill)["free_certificate"]
             assert isinstance(val, (bool, type(None))), (
                 f"'{skill}': free_certificate must be True, False, or None — got {val!r}"
             )
 
     def test_docs_is_a_non_empty_string(self):
-        for skill, entry in LEARNING_RESOURCES.items():
-            assert isinstance(entry["docs"], str) and entry["docs"].strip(), (
+        for skill in LEARNING_RESOURCES:
+            docs = self._basics(skill)["docs"]
+            assert isinstance(docs, str) and docs.strip(), (
                 f"'{skill}': docs must be a non-empty string"
             )
 
     def test_video_is_a_non_empty_string(self):
-        for skill, entry in LEARNING_RESOURCES.items():
-            assert isinstance(entry["video"], str) and entry["video"].strip(), (
+        for skill in LEARNING_RESOURCES:
+            video = self._basics(skill)["video"]
+            assert isinstance(video, str) and video.strip(), (
                 f"'{skill}': video must be a non-empty string"
             )
 
     def test_course_is_a_non_empty_string(self):
-        for skill, entry in LEARNING_RESOURCES.items():
-            assert isinstance(entry["course"], str) and entry["course"].strip(), (
+        for skill in LEARNING_RESOURCES:
+            course = self._basics(skill)["course"]
+            assert isinstance(course, str) and course.strip(), (
                 f"'{skill}': course must be a non-empty string"
             )
 
@@ -142,11 +159,16 @@ class TestGetResources:
         result = get_resources("  python  ")
         assert result is not None
 
-    def test_returns_dict_with_required_keys(self):
+    def test_returns_dict_with_basics_key(self):
         result = get_resources("python")
         assert isinstance(result, dict)
+        assert "basics" in result, "result must have a 'basics' key"
+
+    def test_basics_has_required_keys(self):
+        result = get_resources("python")
+        basics = result["basics"]
         for key in ("docs", "video", "course", "free_certificate"):
-            assert key in result, f"result is missing key '{key}'"
+            assert key in basics, f"result['basics'] is missing key '{key}'"
 
     def test_unknown_skill_returns_none(self):
         result = get_resources("quantum brain surgery")
@@ -171,17 +193,35 @@ class TestGetResources:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestSimulationsData:
-    """Validate JOB_SIMULATIONS and INTERVIEW_SIMULATORS data shape."""
+    """Validate the shape and internal consistency of JOB_SIMULATIONS data."""
 
     def test_job_simulations_is_not_empty(self):
         assert len(JOB_SIMULATIONS) > 0
 
-    def test_every_simulation_has_name_and_link(self):
+    def test_all_keys_are_lowercase(self):
+        # Keys must be lowercase — _match_role() returns lowercase canonical keys
+        for role in JOB_SIMULATIONS:
+            assert role == role.lower(), (
+                f"Key '{role}' is not lowercase — _match_role() will never find it"
+            )
+
+    def test_every_role_has_at_least_one_simulation(self):
         for role, sims in JOB_SIMULATIONS.items():
             assert isinstance(sims, list), f"'{role}' value must be a list"
+            assert len(sims) > 0, f"'{role}' has an empty list — add at least one simulation"
+
+    def test_every_simulation_has_name_and_link(self):
+        for role, sims in JOB_SIMULATIONS.items():
             for sim in sims:
                 assert "name" in sim, f"simulation under '{role}' missing 'name'"
                 assert "link" in sim, f"simulation under '{role}' missing 'link'"
+
+    def test_all_names_are_non_empty_strings(self):
+        for role, sims in JOB_SIMULATIONS.items():
+            for sim in sims:
+                assert isinstance(sim["name"], str) and sim["name"].strip(), (
+                    f"'{role}': simulation has an empty or non-string name"
+                )
 
     def test_all_links_start_with_http(self):
         for role, sims in JOB_SIMULATIONS.items():
@@ -190,31 +230,290 @@ class TestSimulationsData:
                     f"'{role}' → '{sim['name']}': link must start with http"
                 )
 
-    def test_interview_simulators_is_a_list(self):
-        assert isinstance(INTERVIEW_SIMULATORS, list)
+    def test_no_duplicate_links_within_a_role(self):
+        # Two entries with the same URL in the same role list is copy-paste noise
+        for role, sims in JOB_SIMULATIONS.items():
+            links = [sim["link"] for sim in sims]
+            assert len(links) == len(set(links)), (
+                f"'{role}' has duplicate links: "
+                f"{[l for l in links if links.count(l) > 1]}"
+            )
 
-    def test_interview_simulators_not_empty(self):
+
+class TestInterviewSimulatorsData:
+    """Validate the shape of INTERVIEW_SIMULATORS data."""
+
+    def test_is_a_non_empty_list(self):
+        assert isinstance(INTERVIEW_SIMULATORS, list)
         assert len(INTERVIEW_SIMULATORS) > 0
 
-    def test_every_interview_simulator_has_name_and_link(self):
+    def test_every_item_has_name_and_link(self):
         for sim in INTERVIEW_SIMULATORS:
-            assert "name" in sim
-            assert "link" in sim
-            assert sim["link"].startswith("http")
+            assert "name" in sim, f"interview simulator missing 'name': {sim}"
+            assert "link" in sim, f"interview simulator missing 'link': {sim}"
+
+    def test_all_links_start_with_http(self):
+        for sim in INTERVIEW_SIMULATORS:
+            assert sim["link"].startswith("http"), (
+                f"'{sim['name']}': link must start with http"
+            )
+
+    def test_no_duplicate_links(self):
+        links = [sim["link"] for sim in INTERVIEW_SIMULATORS]
+        assert len(links) == len(set(links)), "INTERVIEW_SIMULATORS has duplicate links"
+
+
+class TestRoleKeywordsAlignment:
+    """
+    Verify that _ROLE_KEYWORDS and JOB_SIMULATIONS stay in sync.
+    Every key in _ROLE_KEYWORDS must exist in JOB_SIMULATIONS, otherwise
+    a successful match silently returns [] — the original Bug 1.
+    """
+
+    def test_every_role_keyword_key_exists_in_job_simulations(self):
+        for key in _ROLE_KEYWORDS:
+            assert key in JOB_SIMULATIONS, (
+                f"_ROLE_KEYWORDS has '{key}' but JOB_SIMULATIONS does not. "
+                f"Either add it to JOB_SIMULATIONS or remove it from _ROLE_KEYWORDS."
+            )
+
+    def test_no_empty_keyword_lists(self):
+        for role, keywords in _ROLE_KEYWORDS.items():
+            assert isinstance(keywords, list), f"'{role}' keywords must be a list"
+            assert len(keywords) > 0, f"'{role}' has an empty keyword list"
+
+    def test_all_keywords_are_non_empty_strings(self):
+        for role, keywords in _ROLE_KEYWORDS.items():
+            for kw in keywords:
+                assert isinstance(kw, str) and kw.strip(), (
+                    f"'{role}' contains an empty or non-string keyword"
+                )
+
+    def test_all_keywords_are_lowercase(self):
+        # _match_role() lowercases the input and then does `keyword in text`
+        # so uppercase keywords would never match
+        for role, keywords in _ROLE_KEYWORDS.items():
+            for kw in keywords:
+                assert kw == kw.lower(), (
+                    f"'{role}': keyword '{kw}' is not lowercase — it will never match"
+                )
+
+
+class TestMatchRole:
+    """
+    Tests for _match_role() — the private fuzzy-matching helper.
+
+    Testing private functions directly is fine in a test suite. The underscore
+    means "don't call this from other modules", not "don't test this."
+    Testing it directly lets us verify the matching logic independently of
+    the dictionary lookup step in get_simulations().
+    """
+
+    # ── Guard clauses ─────────────────────────────────────────────────────────
+
+    def test_empty_string_returns_none(self):
+        assert _match_role("") is None
+
+    def test_whitespace_only_returns_none(self):
+        assert _match_role("   ") is None
+
+    def test_unrecognised_role_returns_none(self):
+        assert _match_role("professional interpretive dancer") is None
+
+    def test_unrelated_word_returns_none(self):
+        # "Quantum Wizard" contains "quant" as a substring — must NOT match
+        assert _match_role("Quantum Wizard") is None
+
+    # ── Basic matching ────────────────────────────────────────────────────────
+
+    def test_returns_string_for_known_role(self):
+        result = _match_role("AI Engineer")
+        assert isinstance(result, str)
+
+    def test_result_is_a_valid_job_simulations_key(self):
+        result = _match_role("AI Engineer")
+        assert result in JOB_SIMULATIONS, (
+            f"_match_role returned '{result}' which is not a key in JOB_SIMULATIONS"
+        )
+
+    def test_case_insensitive(self):
+        assert _match_role("ai engineer") == _match_role("AI ENGINEER")
+
+    def test_strips_whitespace(self):
+        assert _match_role("  ai engineer  ") == _match_role("ai engineer")
+
+    def test_role_embedded_in_sentence(self):
+        # User might type "SWE Intern at Meta" — not just "software engineer"
+        result = _match_role("SWE Intern at Meta")
+        assert result is not None
+        assert result in JOB_SIMULATIONS
+
+    # ── Longest-match correctness (the Bug 3 fix) ─────────────────────────────
+
+    def test_machine_learning_engineer_beats_machine_learning(self):
+        # "machine learning" is a keyword in "ai engineer"
+        # "machine learning engineer" is a keyword in "machine learning engineer"
+        # The longer keyword must win
+        result = _match_role("machine learning engineer at Google")
+        assert result == "machine learning engineer", (
+            f"Expected 'machine learning engineer' but got '{result}'. "
+            f"Longest-match is broken — short 'machine learning' keyword is winning."
+        )
+
+    def test_site_reliability_engineer_beats_shorter_matches(self):
+        result = _match_role("site reliability engineer at Google")
+        assert result == "site reliability engineer"
+
+    def test_senior_software_engineer_matches_correctly(self):
+        # Was silently returning [] before the Bug 1 fix
+        result = _match_role("Senior Software Engineer")
+        assert result == "senior software engineer"
+        assert result in JOB_SIMULATIONS
+
+    def test_full_stack_engineer_not_confused_with_software_engineer(self):
+        result = _match_role("full stack engineer")
+        assert result == "full stack engineer"
+
+    # ── Specific role coverage ────────────────────────────────────────────────
+
+    def test_matches_frontend_engineer(self):
+        assert _match_role("Frontend Engineer at Stripe") == "frontend engineer"
+
+    def test_matches_backend_engineer(self):
+        assert _match_role("Backend Engineer") == "backend engineer"
+
+    def test_matches_data_analyst(self):
+        assert _match_role("Data Analyst intern") == "data analyst"
+
+    def test_matches_data_scientist(self):
+        assert _match_role("Data Scientist at Netflix") == "data scientist"
+
+    def test_matches_data_engineer(self):
+        assert _match_role("Data Engineer") == "data engineer"
+
+    def test_matches_devops(self):
+        assert _match_role("DevOps Engineer") == "devops engineer"
+
+    def test_matches_product_manager(self):
+        # Was silently returning [] before the Bug 1 fix
+        result = _match_role("Product Manager at Apple")
+        assert result == "product manager"
+        assert result in JOB_SIMULATIONS
+
+    def test_matches_consulting(self):
+        assert _match_role("Consulting Intern at McKinsey") == "consulting"
+
+    def test_matches_ux_designer(self):
+        assert _match_role("UX Designer") == "ux designer"
+
+    def test_matches_quantitative_analyst(self):
+        result = _match_role("Quantitative Analyst at a hedge fund")
+        assert result == "quantitative analyst"
+
+    def test_quant_analyst_not_quantum(self):
+        # "quant" was removed as a bare keyword because it's a substring of "quantum"
+        assert _match_role("Quantum Computing Researcher") is None
+
+    def test_matches_cybersecurity(self):
+        assert _match_role("Cybersecurity Analyst") == "cybersecurity analyst"
+
+    def test_matches_mobile_developer(self):
+        assert _match_role("iOS Engineer") == "mobile developer"
+
+    def test_matches_qa_engineer(self):
+        assert _match_role("QA Engineer") == "qa engineer"
 
 
 class TestGetSimulations:
     """
-    get_simulations() is a STUB — these tests will FAIL until Phase 7 is done.
+    Tests for get_simulations() — the public interface.
+    Verifies the full pipeline: input → _match_role() → dict lookup → list output.
     """
 
-    def test_known_role_returns_a_list(self):
-        result = get_simulations("AI Engineer")
+    # ── Contract: always return list, never None ──────────────────────────────
+
+    def test_always_returns_a_list(self):
+        assert isinstance(get_simulations("AI Engineer"), list)
+
+    def test_returns_list_not_none_on_no_match(self):
+        result = get_simulations("professional interpretive dancer")
+        assert result is not None
         assert isinstance(result, list)
 
-    def test_known_role_returns_non_empty_list(self):
-        result = get_simulations("AI Engineer")
-        assert len(result) > 0
+    def test_empty_string_returns_empty_list(self):
+        assert get_simulations("") == []
+
+    def test_unknown_role_returns_empty_list(self):
+        assert get_simulations("professional interpretive dancer") == []
+
+    # ── False positive regression tests ──────────────────────────────────────
+
+    def test_quantum_wizard_returns_empty_list(self):
+        # "quant" is a substring of "quantum" — must not match quantitative analyst
+        assert get_simulations("Quantum Wizard") == []
+
+    def test_quantum_computing_returns_empty_list(self):
+        assert get_simulations("Quantum Computing Researcher") == []
+
+    # ── Longest-match regression tests ───────────────────────────────────────
+
+    def test_machine_learning_engineer_not_confused_with_ai_engineer(self):
+        ml_eng = get_simulations("machine learning engineer")
+        ai_eng = get_simulations("ai engineer")
+        assert ml_eng != ai_eng, (
+            "machine learning engineer and ai engineer returned identical results — "
+            "longest-match is broken."
+        )
+
+    def test_senior_swe_returns_simulations(self):
+        # Was silently returning [] before the Bug 1 fix
+        result = get_simulations("Senior Software Engineer")
+        assert isinstance(result, list)
+        assert len(result) > 0, (
+            "Senior Software Engineer returned [] — the _ROLE_KEYWORDS / "
+            "JOB_SIMULATIONS key alignment bug has returned."
+        )
+
+    def test_product_manager_returns_simulations(self):
+        # Was silently returning [] before the Bug 1 fix
+        result = get_simulations("Product Manager at Apple")
+        assert len(result) > 0, (
+            "Product Manager returned [] — check that 'product manager' exists "
+            "in both _ROLE_KEYWORDS and JOB_SIMULATIONS."
+        )
+
+    # ── Role coverage ─────────────────────────────────────────────────────────
+
+    @pytest.mark.parametrize("role", [
+        "AI Engineer",
+        "Software Engineer intern",
+        "SWE Intern at Meta",
+        "Senior Software Engineer at Google",
+        "Frontend Engineer",
+        "Backend Engineer",
+        "Full Stack Engineer",
+        "Mobile Developer",
+        "Data Analyst",
+        "Data Scientist",
+        "Machine Learning Engineer",
+        "Data Engineer",
+        "Cybersecurity Analyst",
+        "Cloud Engineer",
+        "DevOps Engineer",
+        "Product Manager",
+        "UX Designer",
+        "Quantitative Analyst",
+        "Consulting Intern",
+        "QA Engineer",
+    ])
+    def test_known_roles_return_non_empty_list(self, role):
+        result = get_simulations(role)
+        assert len(result) > 0, (
+            f"get_simulations('{role}') returned [] — "
+            f"check _ROLE_KEYWORDS and JOB_SIMULATIONS alignment."
+        )
+
+    # ── Output shape ──────────────────────────────────────────────────────────
 
     def test_each_result_has_name_and_link(self):
         result = get_simulations("AI Engineer")
@@ -222,21 +521,42 @@ class TestGetSimulations:
             assert "name" in sim
             assert "link" in sim
 
-    def test_unknown_role_returns_empty_list(self):
-        # Not [] means the UI would show a wrong simulation — must be strictly []
-        result = get_simulations("professional interpretive dancer")
-        assert result == []
+    def test_each_link_starts_with_http(self):
+        result = get_simulations("Data Scientist")
+        for sim in result:
+            assert sim["link"].startswith("http"), (
+                f"Link does not start with http: {sim['link']}"
+            )
 
     def test_case_insensitive(self):
-        lower = get_simulations("ai engineer")
-        upper = get_simulations("AI ENGINEER")
-        assert lower == upper
+        assert get_simulations("ai engineer") == get_simulations("AI ENGINEER")
 
-    def test_returns_list_not_none(self):
-        # Must return [] on no match, not None — callers iterate the result
-        result = get_simulations("something completely unknown xyz")
-        assert result is not None
-        assert isinstance(result, list)
+    def test_company_name_in_role_doesnt_break_matching(self):
+        # Users often type "X at Company" — should still match
+        assert len(get_simulations("Data Analyst at Google")) > 0
+        assert len(get_simulations("ML Engineer at OpenAI")) > 0
+
+
+class TestGetInterviewSimulators:
+    """Tests for get_interview_simulators() — simple passthrough of INTERVIEW_SIMULATORS."""
+
+    def test_returns_a_list(self):
+        assert isinstance(get_interview_simulators(), list)
+
+    def test_returns_non_empty_list(self):
+        assert len(get_interview_simulators()) > 0
+
+    def test_each_item_has_name_and_link(self):
+        for sim in get_interview_simulators():
+            assert "name" in sim
+            assert "link" in sim
+
+    def test_each_link_starts_with_http(self):
+        for sim in get_interview_simulators():
+            assert sim["link"].startswith("http")
+
+    def test_returns_same_data_as_constant(self):
+        assert get_interview_simulators() == INTERVIEW_SIMULATORS
 
 
 # ══════════════════════════════════════════════════════════════════════════════
