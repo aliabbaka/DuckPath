@@ -12,19 +12,33 @@ def generate_project_idea(skill: str, role: str) -> str:
     """
     Suggest one small, buildable portfolio project that proves `skill` for `role`.
 
-    TODO — Phase 5:
-      - client.chat.completions.create(model=LLM_MODEL, messages=[...])
-      - SYSTEM: "Suggest ONE small portfolio project that demonstrates this skill,
-        relevant to the target role. Name the actual tools. 2-3 sentences, buildable
-        in under a week. Be concrete."
-      - USER: f"Skill: {skill}\\nTarget role: {role}"
-      - Return response.choices[0].message.content (plain text is fine here).
+    Calls the LLM and returns plain text — no JSON needed here because a project
+    idea is narrative, not structured data.
 
     CONTRACT:
         returns: str   # 2-3 sentence project idea
     """
-    # TODO: replace this stub
-    raise NotImplementedError("Phase 5: implement generate_project_idea()")
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You suggest ONE small portfolio project that demonstrates a specific skill, "
+                    "relevant to the target role. Name the actual tools and technologies to use. "
+                    "Keep it to 2-3 sentences. It must be buildable in under a week by a student "
+                    "with basic coding knowledge. Be concrete — no vague advice like 'build an app "
+                    "that uses X'. Say exactly what the app does, what data it uses, what the tech stack should be, and what the "
+                    "output looks like."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Skill: {skill}\nTarget role: {role}",
+            },
+        ],
+    )
+    return response.choices[0].message.content
 
 
 if __name__ == "__main__":
