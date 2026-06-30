@@ -240,31 +240,60 @@ CSS = """
   background: rgba(255,255,255,0.95);
   backdrop-filter: blur(8px);
   border-top: 1px solid #eef0f3;
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.78rem;
-  padding: 0.5rem 1rem;
   z-index: 9999;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0.45rem 1.4rem;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
-.footer a { color: var(--gold); text-decoration: none; }
+.footer-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.footer-author:last-child { justify-content: flex-end; }
+.footer-copy { text-align: center; font-size: 0.75rem; color: var(--muted); }
+.footer a { color: var(--muted); text-decoration: none; line-height: 0; }
+.footer a:hover svg { opacity: 0.75; }
 
-/* Dark-mode toggle pinned to viewport top-right.
-   Selector: sibling-after the hidden anchor div we inject before the button. */
+/* Dark-mode toggle — lives inside the Streamlit header bar, to the left of the ⋮ menu.
+   The header is 2.875rem tall; we match it so the button sits flush in that row. */
 div.block-container > div:has(#dp-toggle-anchor) + div {
   position: fixed !important;
-  top: 10px;
-  right: 78px;
-  z-index: 10001;
+  top: 0 !important;
+  right: 3.5rem !important;   /* ⋮ button is ~2.25rem wide; 3.5rem clears it + running-man */
+  height: 2.875rem !important;
+  display: flex !important;
+  align-items: center !important;
+  z-index: 10002 !important;
   width: fit-content !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+div.block-container > div:has(#dp-toggle-anchor) + div > div,
+div.block-container > div:has(#dp-toggle-anchor) + div [data-testid="stButtonGroup"] {
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
 }
 div.block-container > div:has(#dp-toggle-anchor) + div .stButton button {
-  border-radius: 999px !important;
-  padding: 3px 12px !important;
+  height: 2rem !important;
+  padding: 0 0.5rem !important;
   font-size: 1.05rem !important;
-  line-height: 1.5 !important;
-  border: 1.5px solid var(--gold) !important;
+  line-height: 1 !important;
+  border: none !important;
+  border-radius: 4px !important;
   background: transparent !important;
-  color: var(--gold) !important;
+  color: rgb(49,51,63) !important;
+  box-shadow: none !important;
+}
+div.block-container > div:has(#dp-toggle-anchor) + div .stButton button:hover {
+  background: rgba(151,166,195,0.15) !important;
 }
 
 </style>
@@ -318,12 +347,21 @@ DARK_CSS = """
 .stButton > button[data-testid="baseButton-primary"] {
   background: var(--gold) !important; color: #1B3A57 !important; border: none !important;
 }
+/* Dark-mode toggle sits in the header bar — keep it transparent, not the dark card color */
+div.block-container > div:has(#dp-toggle-anchor) + div .stButton button {
+  background: transparent !important;
+  border: none !important;
+  color: #e2e8f0 !important;
+  box-shadow: none !important;
+}
 
 /* ── Checkbox / radio ── */
 .stCheckbox label, .stRadio label { color: #e2e8f0 !important; }
 
 /* ── Footer ── */
 .footer { background: rgba(15,25,35,0.97) !important; border-top-color: #2d4a66 !important; color: #a0b9cc !important; }
+.footer .footer-copy, .footer .footer-author { color: #a0b9cc !important; }
+.footer svg { fill: #a0b9cc !important; }
 
 /* ── Links ── */
 a { color: var(--gold) !important; }
@@ -679,9 +717,10 @@ if analysis:
             with title_col:
                 st.markdown(f"### {idx + 1}. {skill}")
             with check_col:
-                # Sync checkbox state with the completed set before rendering
                 ck = f"done_{skill}"
-                st.session_state[ck] = skill in st.session_state.completed
+                # Only set initial value — never overwrite after widget is rendered,
+                # otherwise Streamlit discards the user's click every rerun.
+                st.session_state.setdefault(ck, skill in st.session_state.completed)
                 if st.checkbox("Done ✅", key=ck):
                     st.session_state.completed.add(skill)
                 else:
@@ -706,9 +745,8 @@ if analysis:
 
     render_prep_tools(analysis, role)
 
-    LI = (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" '
-        'fill="#0A66C2" style="vertical-align:middle;margin:0 2px">'
+    _LI = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#0A66C2">'
         '<path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 '
         '1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 '
         '0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 '
@@ -716,9 +754,8 @@ if analysis:
         '1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 '
         '.774 23.2 0 22.222 0h.003z"/></svg>'
     )
-    GH = (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" '
-        'fill="#333" style="vertical-align:middle;margin:0 2px">'
+    _GH = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#333">'
         '<path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258'
         '.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 '
         '17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 '
@@ -731,14 +768,24 @@ if analysis:
     )
     st.markdown(
         '<div class="footer">'
-        f'Made by &nbsp;'
-        f'<a href="https://www.linkedin.com/in/mulikuzap/" target="_blank">{LI}</a>'
-        f'<a href="https://github.com/Patrick948-stack" target="_blank">{GH}</a>'
-        f'&nbsp;<b>Patrick MM</b>'
-        f'&nbsp;&nbsp;·&nbsp;&nbsp;'
-        f'<a href="https://www.linkedin.com/in/aliabbaka" target="_blank">{LI}</a>'
-        f'<a href="https://github.com/aliabbaka" target="_blank">{GH}</a>'
-        f'&nbsp;<b>Ali Abbaka</b>'
+
+        # Left — Patrick MM
+        '<div class="footer-author">'
+        'Patrick MM'
+        f'<a href="https://github.com/Patrick948-stack" target="_blank" title="GitHub">{_GH}</a>'
+        f'<a href="https://www.linkedin.com/in/mulikuzap/" target="_blank" title="LinkedIn">{_LI}</a>'
+        '</div>'
+
+        # Centre — copyright
+        '<div class="footer-copy">© 2026 DuckPath</div>'
+
+        # Right — Ali Abbaka
+        '<div class="footer-author">'
+        'Ali Abbaka'
+        f'<a href="https://github.com/aliabbaka" target="_blank" title="GitHub">{_GH}</a>'
+        f'<a href="https://www.linkedin.com/in/aliabbaka" target="_blank" title="LinkedIn">{_LI}</a>'
+        '</div>'
+
         '</div>',
         unsafe_allow_html=True,
     )
