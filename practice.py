@@ -126,8 +126,7 @@ def get_practice(category: str) -> list[str]:
     CONTRACT:
         returns: list[str]
     """
-    # TODO: replace this stub
-    raise NotImplementedError("Phase 5: implement get_practice()")
+    return PRACTICE_RESOURCES.get(category, [])
 
 
 if __name__ == "__main__":
