@@ -48,8 +48,17 @@ def build_outreach_kit(role: str, company: str = "the company") -> dict:
                                      # gets a copy button for free
         }
     """
-    # TODO: replace this stub
-    raise NotImplementedError("Phase 8: implement build_outreach_kit()")
+    
+    linkedin_terms = [
+        f"{company} {role} alumni [your university]",
+        f"{company} recruiter {role}",
+        f"{company} {role} referral"
+    ]
+    return {
+        "linkedin_terms": linkedin_terms,
+        "questions": OUTREACH_QUESTIONS,
+        "email_template": COLD_EMAIL_TEMPLATE
+    }
 
 
 if __name__ == "__main__":
