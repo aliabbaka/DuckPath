@@ -15,19 +15,19 @@ client, AI-orchestration modules, and curated-data modules. Splitting by file is
 deliberate — if Person A is in `projects.py` and Person B is in `simulations.py`,
 Git never has to reconcile the same lines.
 
-| File             | Phase | Does                                      | Owner                            |
-| ---------------- | ----- | ----------------------------------------- | -------------------------------- | ------------------------------------------------ |
-| `config.py`      | 0     | env vars + constants                      | done ✅                          |
-| `llm.py`         | 0     | one shared Groq client                    | done ✅                          |
-| `jobs.py`        | 2     | fetch real postings from JSearch          | done ✅                          | **A**                                            |
-| `analysis.py`    | 3     | AI: postings → skills + interview signals | done ✅                          | **A + B (pair)**                                 |
-| `resources.py`   | 4     | curated: how to learn each skill free     | done ✅                          | **Patrick** (fundamentals) + **B** (specialized) |
-| `projects.py`    | 5     | AI: project idea per skill                | done ✅                          | **Patrick**                                      |
-| `practice.py`    | 5     | curated: where to practice free           | **B**                            |
-| `alt_paths.py`   | 6     | AI: 5 non-project proof paths             | **B**                            |
-| `simulations.py` | 7     | curated: job sims + mock interviews       | **A** (tech) + **B** (corporate) |
-| `outreach.py`    | 8     | networking kit + cold email               | **both**                         |
-| `app.py`         | 9–10  | wire it all together + polish             | **both (Live Share)**            |
+| File             | Phase | Does                                      | Owner                 |
+| ---------------- | ----- | ----------------------------------------- | --------------------- | ------------------------------------------------ |
+| `config.py`      | 0     | env vars + constants                      | done ✅               |
+| `llm.py`         | 0     | one shared Groq client                    | done ✅               |
+| `jobs.py`        | 2     | fetch real postings from JSearch          | done ✅               | **A**                                            |
+| `analysis.py`    | 3     | AI: postings → skills + interview signals | done ✅               | **A + B (pair)**                                 |
+| `resources.py`   | 4     | curated: how to learn each skill free     | done ✅               | **Patrick** (fundamentals) + **B** (specialized) |
+| `projects.py`    | 5     | AI: project idea per skill                | done ✅               | **Patrick**                                      |
+| `practice.py`    | 5     | curated: where to practice free           | **B**                 |
+| `alt_paths.py`   | 6     | AI: 5 non-project proof paths             | **B**                 |
+| `simulations.py` | 7     | curated: job sims + mock interviews       | done ✅               | **A** (tech) + **B** (corporate)                 |
+| `outreach.py`    | 8     | networking kit + cold email               | **both**              |
+| `app.py`         | 9–10  | wire it all together + polish             | **both (Live Share)** |
 
 Curated data lives as Python dicts inside the modules (roadmap style), not in
 `data/*.json`. That's the one intentional difference from DuckPath — simpler for now.
