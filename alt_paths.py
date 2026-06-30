@@ -6,8 +6,7 @@ CONCRETE answers ("fix a good-first-issue on the requests repo", not "contribute
 open source"). Person A tests on technical roles; Person B stress-tests on a role
 where some categories don't fit (and makes the prompt degrade gracefully).
 """
-import json
-from llm import client
+from llm import client, extract_json
 from config import LLM_MODEL
 
 
@@ -58,7 +57,7 @@ def suggest_alt_paths(skill: str, role: str) -> dict:
 
     # Extract the raw JSON string from the response and deserialize it into a dict
     raw_json_string = response.choices[0].message.content
-    return json.loads(raw_json_string)
+    return extract_json(raw_json_string)
 
 
 if __name__ == "__main__":

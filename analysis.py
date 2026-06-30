@@ -20,7 +20,7 @@ DIVISION OF LABOR FOR THIS PAIR SESSION:
 import json
 from collections import Counter
 from config import LLM_MODEL
-from llm import client
+from llm import client, extract_json
 
 
 # ================================================================================
@@ -64,7 +64,7 @@ def analyze_postings(role: str, job_descriptions: list[str]) -> dict:
     raw_json_string = response.choices[0].message.content
 
     # Deserialize the string text back into a functional Python dictionary
-    analysis_data = json.loads(raw_json_string)
+    analysis_data = extract_json(raw_json_string)
 
     return analysis_data
 

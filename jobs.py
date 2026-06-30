@@ -110,10 +110,19 @@ def fetch_postings(role: str) -> list[str]:
         if response.status_code != 200:
             return []
         data_dict = response.json()
-        if "data" not in data_dict or not data_dict["data"]:
+        data = data_dict.get("data")
+        # /search-v2 nests the jobs under data["jobs"]; the older /search endpoint
+        # returned data as a list of jobs directly. Handle both shapes safely.
+        if isinstance(data, dict):
+            jobs = data.get("jobs", [])
+        elif isinstance(data, list):
+            jobs = data
+        else:
+            jobs = []
+        if not jobs:
             return []
         descriptions = []
-        for job in data_dict["data"]:
+        for job in jobs:
             description = job.get("job_description")
             if description:
                 descriptions.append(description)
