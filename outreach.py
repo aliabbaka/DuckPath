@@ -22,7 +22,9 @@ Thanks for considering it,
 OUTREACH_QUESTIONS = [
     "What's one thing you wish you'd known before starting this role?",
     "What does a strong candidate's project portfolio usually look like for this team?",
-    # TODO: add 2-3 more good ones (avoid "can you refer me" — it falls flat)
+    "Which skills do you find people underestimate when preparing for this role?",
+    "How did you break into this field, and what would you do differently today?",
+    "Is there anyone else on the team you'd suggest I learn from?",
 ]
 
 
