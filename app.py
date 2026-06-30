@@ -4,6 +4,8 @@ to reach it, with free resources for every step.
 
 Run:  streamlit run app.py
 """
+import os
+
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -16,7 +18,8 @@ from alt_paths import suggest_alt_paths                 # Phase 6
 from simulations import get_simulations, INTERVIEW_SIMULATORS  # Phase 7
 from outreach import build_outreach_kit                 # Phase 8
 
-st.set_page_config(page_title="DuckPath", layout="centered")
+_FAVICON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "favicon.png")
+st.set_page_config(page_title="DuckPath", page_icon=_FAVICON, layout="centered")
 load_dotenv()
 
 
