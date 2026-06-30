@@ -68,6 +68,38 @@ def analyze_postings(role: str, job_descriptions: list[str]) -> dict:
 
     return analysis_data
 
+
+def analyze_role(role: str) -> dict:
+    """Fallback analysis when no live job postings are found.
+
+    Asks the AI to infer, from general knowledge, the skills a typical posting for
+    this role/goal would require — so the app can still build a roadmap for any
+    input (including free-form goals like "learn machine learning"). Returns the
+    same contract shape as analyze_postings.
+    """
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        response_format={"type": "json_object"},
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert technical recruiter and career mentor. For the "
+                    "given target role or learning goal, output a JSON object with "
+                    "exactly these keys: "
+                    "'core_skills' (a list of specific technical skill names as strings, "
+                    "ordered from foundational to advanced), "
+                    "'interview_focus' (a list of 3-5 short phrases about what gets tested), "
+                    "'experience_signals' (a list of tools or certifications employers want). "
+                    "Base it on what real job postings for this role typically require. "
+                    "Respond ONLY with valid JSON, no extra text."
+                ),
+            },
+            {"role": "user", "content": f"Target role or learning goal: {role}"},
+        ],
+    )
+    return extract_json(response.choices[0].message.content)
+
 # ================================================================================
 # FUNCTION 2: DE-DUPLICATE AND RANK THE TRACKED DATA
 # ================================================================================
