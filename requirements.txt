@@ -3,3 +3,4 @@ groq
 openai
 requests
 python-dotenv
+streamlit-agraph
