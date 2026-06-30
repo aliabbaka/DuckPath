@@ -11,7 +11,7 @@ from jobs import fetch_postings                         # Phase 2
 from analysis import analyze_postings                   # Phase 3
 from resources import get_resources                     # Phase 4
 from projects import generate_project_idea              # Phase 5
-from practice import PRACTICE_RESOURCES                  # Phase 5
+from practice import get_practice                        # Phase 5
 from alt_paths import suggest_alt_paths                 # Phase 6
 from simulations import get_simulations, INTERVIEW_SIMULATORS  # Phase 7
 from outreach import build_outreach_kit                 # Phase 8
@@ -214,6 +214,12 @@ if analysis:
             for item in focus:
                 st.markdown(f"- {item}")
 
+        signals = analysis.get("experience_signals") or []
+        if signals:
+            st.markdown("**What they want to see on your resume**")
+            for item in signals:
+                st.markdown(f"- {item}")
+
         st.markdown("**Try a real job simulation**")
         render_links(get_simulations(role),
                      "No exact match — search this role on Forage or Kaggle.")
@@ -221,8 +227,20 @@ if analysis:
         st.markdown("**Practice the interview itself**")
         render_links(INTERVIEW_SIMULATORS, "No interview simulators listed.")
 
+        st.markdown("**Free practice resources**")
+        for category in ("coding_interviews", "system_design", "behavioral"):
+            items = get_practice(category)
+            if items:
+                st.markdown(f"*{category.replace('_', ' ').title()}*")
+                for item in items:
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;• {item}", unsafe_allow_html=True)
+
         st.markdown("**Network your way in**")
         kit = build_outreach_kit(role)
         for term in kit["linkedin_terms"]:
             st.markdown(f"- {term}")
+        if kit["questions"]:
+            st.markdown("*Questions to ask during the call:*")
+            for q in kit["questions"]:
+                st.markdown(f"&nbsp;&nbsp;&nbsp;• {q}", unsafe_allow_html=True)
         st.code(kit["email_template"], language="text")

@@ -40,6 +40,8 @@ from practice import PRACTICE_RESOURCES, get_practice
 from outreach import COLD_EMAIL_TEMPLATE, OUTREACH_QUESTIONS, build_outreach_kit
 from analysis import rank_skills, analyze_postings
 from jobs import fetch_postings
+from projects import generate_project_idea
+from alt_paths import suggest_alt_paths
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -928,3 +930,143 @@ class TestFetchPostings:
         with patch("jobs.requests.get", return_value=self._make_ok_response(many)):
             result = fetch_postings("Data Analyst")
         assert len(result) <= POSTINGS_TO_ANALYZE
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# projects.py
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestGenerateProjectIdea:
+    """
+    generate_project_idea() calls the LLM and returns plain text.
+    We mock the API call so no real request is made.
+    """
+
+    def _mock_llm(self, text: str) -> MagicMock:
+        return MagicMock(choices=[MagicMock(message=MagicMock(content=text))])
+
+    @patch("projects.client.chat.completions.create")
+    def test_returns_a_string(self, mock_create):
+        mock_create.return_value = self._mock_llm("Build a CLI tool using Python and SQLite.")
+        result = generate_project_idea("Python", "Data Analyst")
+        assert isinstance(result, str)
+
+    @patch("projects.client.chat.completions.create")
+    def test_returns_non_empty_string(self, mock_create):
+        mock_create.return_value = self._mock_llm("Build a CLI tool.")
+        result = generate_project_idea("SQL", "Data Analyst")
+        assert result.strip() != ""
+
+    @patch("projects.client.chat.completions.create")
+    def test_returns_whatever_the_llm_says(self, mock_create):
+        expected = "Build a REST API with FastAPI that serves movie recommendations."
+        mock_create.return_value = self._mock_llm(expected)
+        result = generate_project_idea("Python", "Backend Engineer")
+        assert result == expected
+
+    @patch("projects.client.chat.completions.create")
+    def test_prompt_contains_skill(self, mock_create):
+        mock_create.return_value = self._mock_llm("some idea")
+        generate_project_idea("JavaScript", "Frontend Engineer")
+        messages = mock_create.call_args.kwargs["messages"]
+        user_content = next(m["content"] for m in messages if m["role"] == "user")
+        assert "JavaScript" in user_content
+
+    @patch("projects.client.chat.completions.create")
+    def test_prompt_contains_role(self, mock_create):
+        mock_create.return_value = self._mock_llm("some idea")
+        generate_project_idea("Python", "ML Engineer")
+        messages = mock_create.call_args.kwargs["messages"]
+        user_content = next(m["content"] for m in messages if m["role"] == "user")
+        assert "ML Engineer" in user_content
+
+    @patch("projects.client.chat.completions.create")
+    def test_llm_called_exactly_once(self, mock_create):
+        mock_create.return_value = self._mock_llm("Build something")
+        generate_project_idea("SQL", "Data Engineer")
+        assert mock_create.call_count == 1
+
+    @patch("projects.client.chat.completions.create")
+    def test_system_message_exists(self, mock_create):
+        mock_create.return_value = self._mock_llm("Build something")
+        generate_project_idea("Python", "AI Engineer")
+        messages = mock_create.call_args.kwargs["messages"]
+        roles = [m["role"] for m in messages]
+        assert "system" in roles, "There must be a system message to guide the LLM"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# alt_paths.py
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSuggestAltPaths:
+    """
+    suggest_alt_paths() calls the LLM and must return a dict with exactly 5 keys.
+    We mock the API call so no real request is made.
+    """
+
+    VALID_JSON = json.dumps({
+        "open_source": "Find good-first-issue labels on GitHub in Python repos",
+        "technical_writing": "Write a tutorial on building a REST API with FastAPI",
+        "community_leadership": "Organise a local Python meetup or study group",
+        "competitions": "Enter Kaggle Playground Series competitions",
+        "devops_architecture": "Deploy your project to AWS using a CI/CD pipeline",
+    })
+
+    def _mock_llm(self, text: str) -> MagicMock:
+        return MagicMock(choices=[MagicMock(message=MagicMock(content=text))])
+
+    @patch("alt_paths.client.chat.completions.create")
+    def test_returns_a_dict(self, mock_create):
+        mock_create.return_value = self._mock_llm(self.VALID_JSON)
+        result = suggest_alt_paths("Python", "AI Engineer")
+        assert isinstance(result, dict)
+
+    @patch("alt_paths.client.chat.completions.create")
+    def test_has_all_five_required_keys(self, mock_create):
+        mock_create.return_value = self._mock_llm(self.VALID_JSON)
+        result = suggest_alt_paths("Python", "AI Engineer")
+        required = {"open_source", "technical_writing", "community_leadership",
+                    "competitions", "devops_architecture"}
+        missing = required - set(result.keys())
+        assert not missing, f"Result is missing keys: {missing}"
+
+    @patch("alt_paths.client.chat.completions.create")
+    def test_all_values_are_strings(self, mock_create):
+        mock_create.return_value = self._mock_llm(self.VALID_JSON)
+        result = suggest_alt_paths("Python", "AI Engineer")
+        for key, val in result.items():
+            assert isinstance(val, str), f"Value for '{key}' must be a string, got {type(val)}"
+
+    @patch("alt_paths.client.chat.completions.create")
+    def test_prompt_contains_skill(self, mock_create):
+        mock_create.return_value = self._mock_llm(self.VALID_JSON)
+        suggest_alt_paths("SQL", "Data Analyst")
+        messages = mock_create.call_args.kwargs["messages"]
+        user_content = next(m["content"] for m in messages if m["role"] == "user")
+        assert "SQL" in user_content
+
+    @patch("alt_paths.client.chat.completions.create")
+    def test_prompt_contains_role(self, mock_create):
+        mock_create.return_value = self._mock_llm(self.VALID_JSON)
+        suggest_alt_paths("Python", "Data Analyst")
+        messages = mock_create.call_args.kwargs["messages"]
+        user_content = next(m["content"] for m in messages if m["role"] == "user")
+        assert "Data Analyst" in user_content
+
+    @patch("alt_paths.client.chat.completions.create")
+    def test_requests_json_format(self, mock_create):
+        # Verifies the LLM is told to return JSON, not free text
+        mock_create.return_value = self._mock_llm(self.VALID_JSON)
+        suggest_alt_paths("Python", "AI Engineer")
+        kwargs = mock_create.call_args.kwargs
+        assert kwargs.get("response_format") == {"type": "json_object"}
+
+    @patch("alt_paths.client.chat.completions.create")
+    def test_handles_fenced_json_response(self, mock_create):
+        # Some models wrap JSON in ```json fences — extract_json handles this
+        fenced = f"```json\n{self.VALID_JSON}\n```"
+        mock_create.return_value = self._mock_llm(fenced)
+        result = suggest_alt_paths("Python", "AI Engineer")
+        assert isinstance(result, dict)
+        assert "open_source" in result
