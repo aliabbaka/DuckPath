@@ -1,12 +1,45 @@
-# Career Prep Map
+# DuckPath 
 
-Type a target role ("Google Internship", "AI Engineer", "SWE Intern at Meta") and
-get back a complete, free prep plan: the skills the role demands, how to learn each
-one free, project ideas to prove them, real job simulations, what interviewers test
-for, and how to network your way to a referral.
+**An AI career-roadmap tool: type a target role ("AI Engineer", "SWE Intern at Meta")
+and get a complete, free prep plan — the skills the role demands, how to learn each
+one, projects to prove them, and how to network your way to a referral.**
 
-Built with **Streamlit** + **Groq** (LLM) + **JSearch** (live job postings).
+Powered by a fine-tuned **DistilBERT** multi-label classifier, with **Streamlit** +
+**Groq** (LLM) + **JSearch** (live job postings). In development for launch with
+Whitman College's Career and Community Engagement Center (CCEC).
+## The Model: Multi-Label Opportunity Classifier
 
+DuckPath's core is a fine-tuned `distilbert-base-uncased` classifier that labels
+CS career-opportunity descriptions across three dimensions simultaneously:
+**[dimension 1]**, **[dimension 2]**, and **seniority level**.
+
+### Dataset
+- **4,636** opportunity descriptions collected via [your actual source, e.g., the JSearch API]
+- Cleaned, deduplicated, and annotated for multi-label classification
+- Train/validation/test split: [e.g., 70/15/15]
+- A small sample is included at `model/data_sample.csv`; full dataset available on request
+
+### Results (held-out test set)
+| Metric | Value |
+|---|---|
+| Relevant-label capture across all dimensions | **83.45%** |
+| False-positive rate | **2%** |
+| F1 — seniority prediction | **91.71%** |
+
+Full metrics: [`model/evaluation_results.json`](model/evaluation_results.json) ·
+Confusion matrices: [`model/figures/`](model/figures/)
+
+### Training setup
+- Base model: `distilbert-base-uncased` (HuggingFace Transformers, Trainer API)
+- Hardware: Google Colab [T4] GPU
+- Key hyperparameters: learning rate [2e-5], batch size [16], epochs [N]
+- Full training + evaluation code: [`model/duckpath_classifier.ipynb`](model/duckpath_classifier.ipynb)
+
+### The lesson behind it
+In an earlier project ([TakeMeter](https://github.com/aliabbaka/ai201-project3-takemeter)),
+I watched fine-tuning collapse to the majority class on 50 imbalanced examples.
+DuckPath applies that lesson at scale: [one honest sentence about what you did
+differently — e.g., 4,636 examples and class weighting].
 ## Setup
 
 ```bash
