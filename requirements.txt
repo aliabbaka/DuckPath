@@ -1,5 +1,8 @@
-streamlit
-groq
-openai
-requests
-python-dotenv
+streamlit>=1.40.0
+groq==0.15.0
+python-dotenv==1.0.1
+
+# Not needed here — sentence-transformers/chromadb are for RAG (semantic
+# search over documents), which is what your AI201 project needed.
+# AdvisorPath matches structured records (courses, resources) instead, so
+# SQLite (built into Python — see db.py) does the job with no extra library.
