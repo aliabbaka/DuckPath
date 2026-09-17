@@ -1,324 +1,461 @@
 """
-DuckPath — type a role or field and get a clean, LeetCode-style learning roadmap
-to reach it, with free resources for every step.
+app.py — AdvisorPath, dynamic multi-agent conversational advising platform.
 
-Run:  streamlit run app.py
+Run with:
+    streamlit run app.py
 """
-import os
 
 import streamlit as st
 from dotenv import load_dotenv
 
-from jobs import fetch_postings                         # Phase 2
-from analysis import analyze_postings, analyze_role     # Phase 3
-from resources import get_resources                     # Phase 4
-from projects import generate_project_idea              # Phase 5
-from practice import get_practice                        # Phase 5
-from alt_paths import suggest_alt_paths                 # Phase 6
-from simulations import get_simulations, INTERVIEW_SIMULATORS  # Phase 7
-from outreach import build_outreach_kit                 # Phase 8
+import agents
+import db
+import questions
+from circuit_breaker import SAFE_FALLBACK_BODY, SAFE_FALLBACK_TITLE, screen_input
 
-_FAVICON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "favicon.png")
-st.set_page_config(page_title="DuckPath", page_icon=_FAVICON, layout="centered")
 load_dotenv()
+db.init_db()
+db.seed_if_empty()
 
+st.set_page_config(page_title="AdvisorPath — Dynamic AI Advising", page_icon="🧭", layout="wide")
 
-# ── Caching (slow network/AI calls reused across reruns) ────────────────────
-@st.cache_data(show_spinner=False)
-def cached_postings(role):
-    return fetch_postings(role)
+# Custom styling for agent themes and timeline
+APP_CSS = """
+<style>
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(180deg, #181926 0%, #201e38 50%, #1a162b 100%);
+    color: #f0f0f5;
+}
 
+.agent-badge-A {
+    background-color: #1e3a8a;
+    color: #93c5fd;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    display: inline-block;
+    margin-bottom: 4px;
+}
 
-@st.cache_data(show_spinner=False)
-def cached_analysis(role, postings):
-    return analyze_postings(role, postings)
+.agent-badge-B {
+    background-color: #064e3b;
+    color: #6ee7b7;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    display: inline-block;
+    margin-bottom: 4px;
+}
 
+.agent-badge-C {
+    background-color: #581c87;
+    color: #d8b4fe;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    display: inline-block;
+    margin-bottom: 4px;
+}
 
-@st.cache_data(show_spinner=False)
-def cached_role_analysis(role):
-    return analyze_role(role)
+.user-badge {
+    background-color: #374151;
+    color: #f3f4f6;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    display: inline-block;
+    margin-bottom: 4px;
+}
 
+.chat-bubble {
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 4px solid #6366f1;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+}
 
-@st.cache_data(show_spinner=False)
-def cached_idea(skill, role):
-    return generate_project_idea(skill, role)
+.chat-bubble-A { border-left-color: #3b82f6; }
+.chat-bubble-B { border-left-color: #10b981; }
+.chat-bubble-C { border-left-color: #a855f7; }
+.chat-bubble-User { border-left-color: #9ca3af; }
 
-
-@st.cache_data(show_spinner=False)
-def cached_alt_paths(skill, role):
-    return suggest_alt_paths(skill, role)
-
-
-# ── Styling ─────────────────────────────────────────────────────────────────
-def inject_css(dark=False):
-    base = """
-      .block-container { padding-top: 3.5rem; max-width: 860px; }
-      [data-testid="stSidebar"] { display: none; }
-      [data-testid="stAppDeployButton"] { display: none; }
-      [data-testid="stHeader"] { background: transparent; }
-      .navbar-brand { font-size:1.5rem; font-weight:800; letter-spacing:-.5px; }
-      .navbar-brand b { color:#E0A800; }
-      .nav-sep { border:none; margin:2px 0 18px; }
-      .tagline { text-align:center; font-size:1.02rem; margin:4px 0 14px; }
-      .duck-bob { animation: bob 2.8s ease-in-out infinite; display:block; margin:0 auto; }
-      @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-      .stButton>button { font-weight:700; border-radius:10px; }
-      .footer { text-align:center; font-size:.86rem; line-height:1.7;
-                margin-top:48px; padding-top:18px; }
-      .footer a { text-decoration:none; font-weight:600; }
-    """
-    light = """
-      .navbar-brand { color:#1B3A57; }
-      .nav-sep { border-top:1px solid #e2e8f0; }
-      .tagline { color:#5b7891; }
-      h3 { color:#1B3A57; }
-      .footer { color:#5b7891; border-top:1px solid #e2e8f0; }
-      .footer a { color:#1B3A57; }
-    """
-    dark_css = """
-      .stApp { background:#0E1B2A; }
-      .stApp, .stMarkdown, [data-testid="stMarkdownContainer"], p, span, div, label, li,
-      h1, h2, h3, h4, h5, strong, em, summary { color:#E8EEF5 !important; }
-      .navbar-brand { color:#E8EEF5 !important; }
-      .navbar-brand b { color:#FFC93B !important; }
-      .nav-sep { border-top:1px solid #2B3F57; }
-      .tagline { color:#9FB3C8 !important; }
-      [data-testid="stExpander"] { background:#16263A; border:1px solid #2B3F57; border-radius:10px; }
-      [data-testid="stExpander"] summary { color:#E8EEF5 !important; }
-      [data-testid="stExpander"] summary:hover { color:#FFC93B !important; }
-      .stTextInput input { background:#16263A !important; color:#E8EEF5 !important;
-                           border-color:#2B3F57 !important; }
-      .stTextInput input::placeholder { color:#7E94AC !important; }
-      [data-testid="stCaptionContainer"], .stCaption,
-      [data-testid="stCaptionContainer"] p { color:#9FB3C8 !important; }
-      code, pre, pre * { background:#16263A !important; color:#E8EEF5 !important; }
-      .stButton>button { background:#E0A800 !important; border:1px solid #E0A800 !important; }
-      .stButton>button:hover { background:#F0BC1A !important; border-color:#F0BC1A !important; }
-      .stButton>button p, .stButton>button span, .stButton>button div {
-          color:#0E1B2A !important; }
-      [data-testid="stMainMenu"] button { color:#E8EEF5 !important; }
-      [data-testid="stHeader"] button svg, [data-testid="stMainMenu"] svg {
-          fill:#E8EEF5 !important; color:#E8EEF5 !important; }
-      [data-testid="stMainMenuItem"], [data-testid="stMainMenuItem"] *,
-      [data-testid="stMainMenuItemLabel"] { color:#1B3A57 !important; }
-      .footer { color:#9FB3C8 !important; border-top:1px solid #2B3F57; }
-      .footer a { color:#FFC93B !important; }
-    """
-    css = base + (dark_css if dark else light)
-    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
-
-
-DUCK_SVG = """
-<svg class="duck-bob" width="66" height="66" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <ellipse cx="48" cy="64" rx="33" ry="28" fill="#FFD23F"/>
-  <path d="M22 66 q26 20 52 0 q-26 26 -52 0" fill="#F4BE1E"/>
-  <circle cx="62" cy="38" r="23" fill="#FFDD55"/>
-  <circle cx="70" cy="33" r="4.6" fill="#27384a"/>
-  <circle cx="71.6" cy="31.4" r="1.5" fill="#fff"/>
-  <path d="M83 38 q19 5 0 12 q-7 -6 0 -12" fill="#FF924C"/>
-</svg>
+.roadmap-eyebrow {
+    color: rgba(255,255,255,0.8); letter-spacing: 3px; font-size: 0.75rem;
+    text-transform: uppercase; text-align: center; font-weight: 700; margin-bottom: 0;
+}
+.roadmap-title {
+    color: white; text-align: center; font-weight: 800; font-size: 1.8rem;
+    margin-top: 0; margin-bottom: 1.5rem;
+}
+.timeline-card {
+    background: rgba(30, 20, 70, 0.65); border-radius: 12px; padding: 12px 16px;
+    color: white; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1);
+}
+.timeline-card .horizon-label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;
+    margin-bottom: 4px; color: #a7f3d0;
+}
+.skill-gap-box {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid #ef4444;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    color: #fca5a5;
+    margin-top: 6px;
+}
+</style>
 """
 
+st.markdown(APP_CSS, unsafe_allow_html=True)
 
-# ── Roadmap graph (LeetCode/NeetCode style: connected nodes, top → goal) ─────
-def build_roadmap_dot(skills, role, dark=False):
-    def esc(s):
-        return str(s).replace('"', "'")
+# ── session state initialization ──────────────────────────────────────────
+defaults = {
+    "student_id": None,
+    "institution_id": "whitman",
+    "year": "sophomore",
+    "interests": ["ai-ml", "cybersecurity"],
+    "completed_courses": [],
+    "chat_messages": [],
+    "recommendations": None,
+    "show_split_screen": False,
+    "blocked_reason": None,
+    "roadmap_items": [],
+}
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
-    accent = "#E0A800"
-    if dark:
-        node_fill, node_font = "#16263A", "#E8EEF5"
-        end_fill, end_font = "#E0A800", "#0E1B2A"
-    else:
-        node_fill, node_font = "#FFF6DC", "#1B3A57"
-        end_fill, end_font = "#1B3A57", "white"
+# Initialize student ID in db if not present
+if not st.session_state.student_id:
+    student_id = db.insert_student_profile(
+        st.session_state.institution_id,
+        st.session_state.year,
+        st.session_state.interests,
+        st.session_state.completed_courses,
+        "beginner",
+    )
+    st.session_state.student_id = student_id
+    st.session_state.roadmap_items = db.get_roadmap_items(student_id)
 
-    lines = [
-        "digraph roadmap {",
-        '  rankdir=TB; bgcolor="transparent"; pad=0.3; nodesep=0.45; ranksep=0.55;',
-        f'  node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=13 '
-        f'penwidth=1.4 color="{accent}" fillcolor="{node_fill}" fontcolor="{node_font}" '
-        'margin="0.28,0.16"];',
-        f'  edge [color="{accent}" penwidth=2 arrowsize=0.7];',
-        f'  start [label="Start here" fillcolor="{end_fill}" fontcolor="{end_font}" '
-        f'color="{end_fill}"];',
+    # Initial welcoming greeting from Agent A
+    welcome_msg = (
+        "Hello! We're your AI advising team. I'm Agent A (Academic Tracker), and alongside "
+        "Agent B (Professional Matcher) and Agent C (Visionary Futurist), we're here to help shape your personalized path. "
+        "Tell us: what CS or STEM topics excite you right now, and what projects or courses have you taken?"
+    )
+    st.session_state.chat_messages.append({"speaker": "Agent A", "agent_id": "A", "content": welcome_msg})
+    db.save_chat_message(student_id, "Agent A", welcome_msg)
+
+st.title("🧭 AdvisorPath — Interactive Multi-Agent Advising")
+
+
+# ── Header & Setup Sidebar ────────────────────────────────────────────────
+with st.sidebar:
+    st.header("⚙️ Student Setup")
+    institutions = db.get_institutions()
+    inst_options = {i["id"]: i["name"] for i in institutions}
+    chosen_inst = st.selectbox(
+        "University / Institution",
+        options=list(inst_options.keys()),
+        format_func=lambda k: inst_options[k],
+        index=0 if st.session_state.institution_id == "whitman" else 1,
+    )
+    st.session_state.institution_id = chosen_inst
+
+    chosen_year = st.selectbox(
+        "Current Year",
+        options=["first-year", "sophomore", "junior", "senior"],
+        index=["first-year", "sophomore", "junior", "senior"].index(st.session_state.year),
+    )
+    st.session_state.year = chosen_year
+
+    st.markdown("---")
+    st.markdown("### 🤖 Your Advisory Team")
+    st.markdown('<span class="agent-badge-A">🎓 Agent A</span> Academic Tracker (Unlocked Courses & Skills)', unsafe_allow_html=True)
+    st.markdown('<span class="agent-badge-B">💼 Agent B</span> Professional Matcher (Real Opportunities & Projects)', unsafe_allow_html=True)
+    st.markdown('<span class="agent-badge-C">🚀 Agent C</span> Visionary Futurist (Next Horizons & Advanced Roles)', unsafe_allow_html=True)
+
+    st.markdown("---")
+    if st.button("Reset Conversation & Roadmap"):
+        st.session_state.chat_messages = []
+        st.session_state.recommendations = None
+        st.session_state.show_split_screen = False
+        st.session_state.student_id = None
+        st.rerun()
+
+
+# ── Profile Dict Helper ──────────────────────────────────────────────────
+def get_current_profile():
+    return {
+        "institution_id": st.session_state.institution_id,
+        "year": st.session_state.year,
+        "interests": st.session_state.interests,
+        "completed_courses": st.session_state.completed_courses,
+        "experience_level": "beginner",
+    }
+
+
+# ── Chat Handler ──────────────────────────────────────────────────────────
+def handle_user_message(user_input):
+    is_safe, reason = screen_input(user_input)
+    if not is_safe:
+        st.session_state.blocked_reason = reason
+        st.rerun()
+        return
+
+    # 1. Append user message
+    student_id = st.session_state.student_id
+    st.session_state.chat_messages.append({"speaker": "User", "agent_id": "User", "content": user_input})
+    db.save_chat_message(student_id, "User", user_input)
+
+    # Detect interests from user text simple heuristic update
+    text_lower = user_input.lower()
+    for tag in questions.INTEREST_LABELS:
+        if tag.replace("-", " ") in text_lower or questions.INTEREST_LABELS[tag].lower() in text_lower:
+            if tag not in st.session_state.interests:
+                st.session_state.interests.append(tag)
+
+    # 2. Pick next responding agent based on sequence or user prompt
+    last_agent = next((m["agent_id"] for m in reversed(st.session_state.chat_messages) if m["agent_id"] in ("A", "B", "C")), "C")
+    next_agent = {"A": "B", "B": "C", "C": "A"}.get(last_agent, "A")
+
+    # Format transcript history for the agent
+    history = [
+        {"speaker": m["speaker"], "content": m["content"]}
+        for m in st.session_state.chat_messages
     ]
-    prev = "start"
-    for i, skill in enumerate(skills):
-        nid = f"s{i}"
-        lines.append(f'  {nid} [label="{i + 1}. {esc(skill)}"];')
-        lines.append(f"  {prev} -> {nid};")
-        prev = nid
-    lines.append(f'  goal [label="GOAL: {esc(role)}" fillcolor="{end_fill}" '
-                 f'fontcolor="{end_font}" color="{end_fill}"];')
-    lines.append(f"  {prev} -> goal;")
-    lines.append("}")
-    return "\n".join(lines)
 
-
-def render_resources(res):
-    """Render the curated-resource dict as friendly bullets."""
-    for _section, fields in res.items():
-        if not isinstance(fields, dict):
-            st.write(fields)
-            continue
-        for key, val in fields.items():
-            label = key.replace("_", " ").title()
-            if isinstance(val, bool):
-                if val:
-                    st.markdown(f"- {label}: yes")
-            elif isinstance(val, list):
-                st.markdown(f"**{label}:**")
-                for item in val:
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;• {item}", unsafe_allow_html=True)
-            else:
-                st.markdown(f"- **{label}:** {val}")
-
-
-def render_alt_paths(alt):
-    if not isinstance(alt, dict):
-        st.write(alt)
-        return
-    for key, val in alt.items():
-        st.markdown(f"- **{key.replace('_', ' ').title()}:** {val}")
-
-
-def render_links(items, empty_msg):
-    if not items:
-        st.info(empty_msg)
-        return
-    for it in items:
-        name, link = it.get("name", "Resource"), it.get("link", "")
-        st.markdown(f"- [{name}]({link})" if link else f"- {name}")
-
-
-# ── Navbar ──────────────────────────────────────────────────────────────────
-nav_left, nav_right = st.columns([3, 1], vertical_alignment="center")
-with nav_left:
-    st.markdown('<div class="navbar-brand">Duck<b>Path</b></div>', unsafe_allow_html=True)
-with nav_right:
-    night = st.toggle("Night mode", key="night_mode")
-
-inject_css(dark=night)
-st.markdown('<hr class="nav-sep">', unsafe_allow_html=True)
-
-st.markdown(DUCK_SVG, unsafe_allow_html=True)
-st.markdown('<div class="tagline">Type a role or field — get a free, step-by-step '
-            'roadmap to reach it.</div>', unsafe_allow_html=True)
-
-st.session_state.setdefault("analysis", None)
-st.session_state.setdefault("role", "")
-
-role_input = st.text_input(
-    "Target role or field",
-    placeholder="e.g. Machine Learning Engineer, Data Analyst, Frontend Developer",
-    label_visibility="collapsed",
-)
-go = st.button("Build my roadmap", use_container_width=True)
-
-if go:
-    role = role_input.strip()
-    if not role:
-        st.warning("Type a role or field first — e.g. \"Machine Learning Engineer\".")
-        st.stop()
     try:
-        with st.spinner("Mapping your path..."):
-            postings = cached_postings(role)
-            if postings:
-                analysis = cached_analysis(role, postings)
-            else:
-                # No live postings (e.g. a free-form goal) — build the roadmap from
-                # the AI's general knowledge of the role instead.
-                analysis = cached_role_analysis(role)
+        reply = agents.run_chat_agent(next_agent, history, profile_context=get_current_profile())
     except Exception as e:
-        st.error(f"Something went wrong while building your roadmap: {e}")
-        st.stop()
+        reply = f"Thank you for sharing that! (Note: Could not reach Groq: {e})"
 
-    if not analysis.get("core_skills"):
-        st.warning("I couldn't pin down clear skills for that. Try rephrasing it, "
-                   "e.g. \"Machine Learning Engineer\".")
-        st.stop()
+    speaker_name = f"Agent {next_agent}"
+    st.session_state.chat_messages.append({"speaker": speaker_name, "agent_id": next_agent, "content": reply})
+    db.save_chat_message(student_id, speaker_name, reply)
 
-    st.session_state.analysis = analysis
-    st.session_state.role = role
-
-# ── Results ─────────────────────────────────────────────────────────────────
-analysis = st.session_state.analysis
-role = st.session_state.role
-
-if analysis:
-    skills = analysis["core_skills"]
-
-    st.markdown(f"### Your roadmap to {role}")
-    st.caption("Follow it top to bottom. Each step below has free resources and a "
-               "project to prove it.")
-    st.graphviz_chart(build_roadmap_dot(skills, role, dark=night), use_container_width=True)
-
-    st.markdown("### Learn each step")
-    for i, skill in enumerate(skills, 1):
-        with st.expander(f"Step {i} — {skill}"):
-            st.markdown("**Learn it (free)**")
-            res = get_resources(skill)
-            if res:
-                render_resources(res)
-            else:
-                st.info("No curated resources for this one yet.")
-
-            st.markdown("**Prove it with a project**")
-            st.write(cached_idea(skill, role))
-
-            st.markdown("**Other ways to prove it**")
-            render_alt_paths(cached_alt_paths(skill, role))
-
-    # Extra prep tools — collapsed and optional, so they stay out of the way.
-    with st.expander("Extra prep tools (interviews, simulations, networking)"):
-        focus = analysis.get("interview_focus") or []
-        if focus:
-            st.markdown("**What interviewers test for**")
-            for item in focus:
-                st.markdown(f"- {item}")
-
-        signals = analysis.get("experience_signals") or []
-        if signals:
-            st.markdown("**What they want to see on your resume**")
-            for item in signals:
-                st.markdown(f"- {item}")
-
-        st.markdown("**Try a real job simulation**")
-        render_links(get_simulations(role),
-                     "No exact match — search this role on Forage or Kaggle.")
-
-        st.markdown("**Practice the interview itself**")
-        render_links(INTERVIEW_SIMULATORS, "No interview simulators listed.")
-
-        st.markdown("**Free practice resources**")
-        for category in ("coding_interviews", "system_design", "behavioral"):
-            items = get_practice(category)
-            if items:
-                st.markdown(f"*{category.replace('_', ' ').title()}*")
-                for item in items:
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;• {item}", unsafe_allow_html=True)
-
-        st.markdown("**Network your way in**")
-        kit = build_outreach_kit(role)
-        for term in kit["linkedin_terms"]:
-            st.markdown(f"- {term}")
-        if kit["questions"]:
-            st.markdown("*Questions to ask during the call:*")
-            for q in kit["questions"]:
-                st.markdown(f"&nbsp;&nbsp;&nbsp;• {q}", unsafe_allow_html=True)
-        st.code(kit["email_template"], language="text")
+    st.rerun()
 
 
-# ── Contributors ────────────────────────────────────────────────────────────
-st.markdown(
-    '<div class="footer">'
-    '<div>Ali Abbaka — '
-    '<a href="https://github.com/aliabbaka" target="_blank">GitHub</a> · '
-    '<a href="https://www.linkedin.com/in/aliabbaka" target="_blank">LinkedIn</a></div>'
-    '<div>Patrick Mulikuza — '
-    '<a href="https://github.com/Patrick948-stack" target="_blank">GitHub</a> · '
-    '<a href="https://www.linkedin.com/in/mulikuzap" target="_blank">LinkedIn</a></div>'
-    '</div>',
-    unsafe_allow_html=True,
-)
+# ── Render Chat Interface ─────────────────────────────────────────────────
+def render_chat_panel():
+    st.subheader("💬 Live Multi-Agent Advising Chat")
+    st.caption("Chat dynamically with your advisors to narrow down your interests and explore opportunities.")
+
+    chat_container = st.container()
+    with chat_container:
+        for m in st.session_state.chat_messages:
+            agent_id = m.get("agent_id", "User")
+            speaker = m.get("speaker", "User")
+            content = m.get("content", "")
+
+            badge_class = f"agent-badge-{agent_id}" if agent_id in ("A", "B", "C") else "user-badge"
+            bubble_class = f"chat-bubble-{agent_id}"
+
+            st.markdown(
+                f'''<div class="chat-bubble {bubble_class}">
+                    <span class="{badge_class}">{speaker}</span><br>
+                    <span>{content}</span>
+                </div>''',
+                unsafe_allow_html=True,
+            )
+
+    # User input chat box
+    with st.form(key="chat_input_form", clear_on_submit=True):
+        user_input = st.text_input("Type a message or answer advisor questions:", placeholder="e.g. I enjoyed Data Structures and want to explore Cybersecurity...")
+        cols = st.columns([4, 3])
+        with cols[0]:
+            submit_msg = st.form_submit_button("Send Message 🚀")
+        with cols[1]:
+            ready_advice = st.form_submit_button("✨ Ready for Advice / Recommendations")
+
+        if submit_msg and user_input.strip():
+            handle_user_message(user_input.strip())
+        elif ready_advice:
+            trigger_advice_generation()
+
+
+def trigger_advice_generation():
+    profile = get_current_profile()
+    student_id = st.session_state.student_id
+
+    with st.spinner("Advisors are reviewing candidates, checking prerequisites, and organizing advice proposals..."):
+        try:
+            proposals = agents.generate_recommendations_proposal(profile, st.session_state.chat_messages)
+        except Exception as e:
+            st.error(f"Error generating advice proposals: {e}")
+            return
+
+    st.session_state.recommendations = proposals
+    st.session_state.show_split_screen = True
+
+    # Add advisor announcement to chat
+    announcement = (
+        "We've analyzed your profile and candidate opportunities! Review our tailored proposals below. "
+        "Select whichever items fit your goal to build your private roadmap on the right."
+    )
+    st.session_state.chat_messages.append({"speaker": "Team Advisor", "agent_id": "A", "content": announcement})
+    db.save_chat_message(student_id, "Team Advisor", announcement)
+    st.rerun()
+
+
+# ── Render Advice Proposals Section ────────────────────────────────────────
+def render_advice_proposals():
+    st.markdown("---")
+    st.markdown("### 🎯 Agent Recommendations & Proposals")
+    st.caption("Select items proposed by each agent to add to your private roadmap on the right.")
+
+    proposals = st.session_state.recommendations
+    if not proposals:
+        st.info("No recommendations generated yet. Click 'Ready for Advice' above!")
+        return
+
+    agent_titles = {
+        "A": "🎓 Agent A (Academic Tracker — Open & Required Courses)",
+        "B": "💼 Agent B (Professional Matcher — Active Opportunities & Projects)",
+        "C": "🚀 Agent C (Visionary Futurist — Next Horizon & Advanced Goals)",
+    }
+
+    for agent_id in ["A", "B", "C"]:
+        items = proposals.get(agent_id, [])
+        with st.expander(agent_titles[agent_id], expanded=True):
+            if not items:
+                st.write("No specific items proposed for this category.")
+                continue
+
+            for idx, item in enumerate(items):
+                col_info, col_btn = st.columns([4, 1])
+                with col_info:
+                    st.markdown(f"**{item['title']}**")
+                    st.markdown(f"<span style='font-size:0.85rem;'>{item['description']}</span>", unsafe_allow_html=True)
+
+                    if item.get("skill_gap"):
+                        st.markdown(f'<div class="skill-gap-box">⚠️ <b>Skill Gap / Prerequisite:</b> {item["skill_gap"]}</div>', unsafe_allow_html=True)
+
+                    if item.get("resolved_url"):
+                        st.markdown(f'<a href="{item["resolved_url"]}" target="_blank" style="font-size:0.8rem; color:#a7f3d0;">Verified Resource Link ↗</a>', unsafe_allow_html=True)
+
+                with col_btn:
+                    btn_key = f"add_proposal_{agent_id}_{idx}_{item['reference_id']}"
+                    # Check if already added
+                    already_added = any(r["reference_id"] == item["reference_id"] for r in st.session_state.roadmap_items)
+                    if already_added:
+                        st.caption("✅ On Roadmap")
+                    else:
+                        if st.button("➕ Add", key=btn_key):
+                            add_item_to_roadmap(item)
+
+
+def add_item_to_roadmap(item):
+    student_id = st.session_state.student_id
+    db.insert_roadmap_items(student_id, [item])
+    st.session_state.roadmap_items = db.get_roadmap_items(student_id)
+
+    # Dynamic Agent Reaction in chat transcript
+    reactions = agents.evaluate_roadmap_addition(student_id, item, get_current_profile(), st.session_state.roadmap_items)
+    for agent_name, reaction in reactions.items():
+        agent_code = "A" if "A" in agent_name else ("B" if "B" in agent_name else "C")
+        st.session_state.chat_messages.append({"speaker": agent_name, "agent_id": agent_code, "content": reaction})
+        db.save_chat_message(student_id, agent_name, reaction)
+
+    st.toast(f"Added '{item['title']}' to your private roadmap!")
+    st.rerun()
+
+
+# ── Render Private Roadmap Panel ─────────────────────────────────────────
+def render_roadmap_panel():
+    st.markdown('<p class="roadmap-eyebrow">Personal Timeline</p>', unsafe_allow_html=True)
+    st.markdown('<p class="roadmap-title">Your Private Roadmap</p>', unsafe_allow_html=True)
+
+    items = st.session_state.roadmap_items
+    if not items:
+        st.info("Your roadmap is currently empty. Pick items from the Advisor Proposals or explore below to populate it!")
+    else:
+        horizon_order = {"now-open": 0, "active-contribution": 1, "next-horizon": 2}
+        horizon_labels = {
+            "now-open": "Now Open", "active-contribution": "Active Contribution", "next-horizon": "Next Horizon",
+        }
+        lane_badges = {"academic": "🎓 Academic", "professional": "💼 Professional"}
+
+        ordered = sorted(items, key=lambda i: horizon_order.get(i["horizon"], 99))
+
+        for idx, item in enumerate(ordered):
+            st.markdown(
+                f'''<div class="timeline-card">
+                    <div class="horizon-label">{horizon_labels.get(item["horizon"], item["horizon"])}
+                        · {lane_badges.get(item["lane"], item["lane"])}</div>
+                    <b>{item["title"]}</b><br>
+                    <span style="font-size:0.85rem;opacity:0.9;">{item["description"]}</span>
+                </div>''',
+                unsafe_allow_html=True,
+            )
+            if item.get("resolved_url"):
+                st.markdown(
+                    f'<a href="{item["resolved_url"]}" target="_blank" style="color:#e3d9ff; font-size:0.8rem;">Open verified link ↗</a>',
+                    unsafe_allow_html=True,
+                )
+
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                if item["claimed"]:
+                    st.caption("✅ Completed")
+                elif st.button("Mark Completed", key=f"claim_{item['id']}"):
+                    db.claim_roadmap_item(item["id"])
+                    st.session_state.roadmap_items = db.get_roadmap_items(st.session_state.student_id)
+                    st.rerun()
+
+    render_add_interest_section()
+
+
+def render_add_interest_section():
+    st.markdown("---")
+    st.markdown("#### Explore More Catalog Topics")
+
+    current = set(st.session_state.interests)
+    available = [tag for tag in questions.INTEREST_LABELS if tag not in current]
+
+    if available:
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            chosen_tag = st.selectbox(
+                "Explore new domain",
+                options=available,
+                format_func=lambda t: questions.INTEREST_LABELS[t],
+                label_visibility="collapsed",
+            )
+        with col2:
+            if st.button("Add Topic"):
+                institution_id = st.session_state.institution_id
+                added = db.add_interest(st.session_state.student_id, institution_id, chosen_tag)
+                db.add_interest_to_profile(st.session_state.student_id, chosen_tag)
+                st.session_state.interests.append(chosen_tag)
+                st.session_state.roadmap_items = db.get_roadmap_items(st.session_state.student_id)
+                st.toast(f"Added {len(added)} items for {questions.INTEREST_LABELS[chosen_tag]}.")
+                st.rerun()
+
+
+# ── Main Render Layout ────────────────────────────────────────────────────
+if st.session_state.blocked_reason:
+    st.warning(f"**{SAFE_FALLBACK_TITLE}**\n\n{st.session_state.blocked_reason}")
+    if st.button("Try again"):
+        st.session_state.blocked_reason = None
+        st.rerun()
+
+elif not st.session_state.show_split_screen:
+    # Full screen conversation before recommendations start
+    render_chat_panel()
+
+else:
+    # Split screen layout: Chat + Proposals on Left, Private Roadmap on Right
+    left_col, right_col = st.columns([3, 2])
+    with left_col:
+        render_chat_panel()
+        render_advice_proposals()
+    with right_col:
+        render_roadmap_panel()
