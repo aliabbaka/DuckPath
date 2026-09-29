@@ -33,7 +33,7 @@ GROQ_API_KEY = get_key("GROQ_API_KEY")
 
 if GROQ_API_KEY:
     LLM_PROVIDER = "groq"
-    LLM_MODEL = "llama-3.3-70b-versatile"
+    LLM_MODEL = "openai/gpt-oss-120b"   # llama-3.3-70b-versatile was deprecated on the free/dev tier
 else:
     LLM_PROVIDER = "openrouter"
     LLM_MODEL = "meta-llama/llama-3.3-70b-instruct"
