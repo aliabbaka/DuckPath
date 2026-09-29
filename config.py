@@ -31,7 +31,7 @@ GROQ_API_KEY = get_key("GROQ_API_KEY")
 
 if OPENROUTER_API_KEY:
     LLM_PROVIDER = "openrouter"
-    LLM_MODEL = "meta-llama/llama-3.3-70b-instruct"   # add ':free' for the free tier
+    LLM_MODEL = "meta-llama/llama-3.3-70b-instruct:free"   # free tier, no purchased credits required
 else:
     LLM_PROVIDER = "groq"
     LLM_MODEL = "llama-3.3-70b-versatile"
