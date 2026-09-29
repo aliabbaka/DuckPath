@@ -24,17 +24,19 @@ def get_key(name):
 
 
 # --- LLM provider ---
-# Prefer OpenRouter when its key is set; otherwise fall back to Groq. Both expose
-# the same OpenAI-style chat.completions interface, so the calling code is unchanged.
+# Prefer Groq when its key is set: its free tier doesn't require purchased credits
+# and doesn't depend on OpenRouter's free-model slugs, which come and go. Fall back
+# to OpenRouter otherwise. Both expose the same OpenAI-style chat.completions
+# interface, so the calling code is unchanged.
 OPENROUTER_API_KEY = get_key("OPENROUTER_API_KEY")
 GROQ_API_KEY = get_key("GROQ_API_KEY")
 
-if OPENROUTER_API_KEY:
-    LLM_PROVIDER = "openrouter"
-    LLM_MODEL = "meta-llama/llama-3.3-70b-instruct:free"   # free tier, no purchased credits required
-else:
+if GROQ_API_KEY:
     LLM_PROVIDER = "groq"
     LLM_MODEL = "llama-3.3-70b-versatile"
+else:
+    LLM_PROVIDER = "openrouter"
+    LLM_MODEL = "meta-llama/llama-3.3-70b-instruct"
 
 # --- Job postings API (JSearch via RapidAPI) ---
 RAPIDAPI_KEY = get_key("RAPIDAPI_KEY")
